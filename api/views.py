@@ -3,8 +3,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
-from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer
-from .models import Budget, Expense, Income
+from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer
+from .models import Budget, Expense, Income, Category
 
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -54,7 +54,7 @@ class BudgetDeleteView(generics.DestroyAPIView):
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['id', 'name', 'amount', 'created_at']
+    filterset_fields = ['id', 'name', 'amount', 'created_at', 'category']
     def get_queryset(self):
         queryset = Expense.objects.filter(budget__user=self.request.user)
         budget_id = self.request.query_params.get('id', None)
@@ -125,3 +125,17 @@ class IncomeDeleteView(generics.DestroyAPIView):
     def get_queryset(self):
         userName = self.request.user
         return Income.objects.filter(user=userName) 
+
+class CategoryListView(generics.ListCreateAPIView):
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Category.objects.all()
+    
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save()
+        else:
+            print(serializer.errors)
+
