@@ -1,6 +1,12 @@
 from django.contrib.auth.models import User
+from django.db.models import Sum, Avg, F, ExpressionWrapper, DecimalField
+from django.db.models.functions import ExtractMonth, ExtractYear
+from django.utils.timezone import now
+from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, viewsets
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
 from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer
@@ -139,3 +145,76 @@ class CategoryListView(generics.ListCreateAPIView):
         else:
             print(serializer.errors)
 
+
+
+
+@api_view(['GET'])
+def analytics(request):
+    user = request.user
+
+    # 1. Most spent on category
+    most_spent_category = Expense.objects.filter(budget__user=user) \
+        .values('category__name') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('-total_spent') \
+        .first()
+    
+    # 2. Least spent on category
+    least_spent_category = Expense.objects.filter(budget__user=user) \
+        .values('category__name') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('total_spent') \
+        .first()
+
+
+    # 3. Average monthly spent
+    start_date = now() - timedelta(days=30)
+    average_monthly_spent = Expense.objects.filter(budget__user=user, created_at__gte=start_date) \
+        .aggregate(average_monthly_spent=Avg('amount'))['average_monthly_spent']
+
+    # 4. Net income (total income - total expenses)
+    total_income = Income.objects.filter(user=user).aggregate(total_income=Sum('amount'))['total_income']
+    total_expenses = Expense.objects.filter(budget__user=user).aggregate(total_expenses=Sum('amount'))['total_expenses']
+    net_income = total_income - total_expenses
+
+    # Additional Statistics
+    # 5. Spending per Month
+    spending_per_month = Expense.objects.filter(budget__user=user) \
+        .annotate(month=ExtractMonth('created_at')) \
+        .values('month') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('month')
+
+    # 6. Spending by Category
+    spending_by_category = Expense.objects.filter(budget__user=user) \
+        .values('category__name') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('-total_spent')
+    
+    # 7. Total spending for the current month
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    total_spent_current_month = Expense.objects.filter(
+        budget__user=user, 
+        created_at__year=current_year, 
+        created_at__month=current_month
+    ).aggregate(total_spent=Sum('amount'))['total_spent']
+
+    # 8. Spending by Category per Month
+    spending_by_category_per_month = Expense.objects.filter(budget__user=user) \
+        .annotate(month=ExtractMonth('created_at')) \
+        .values('category__name', 'month') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('category__name', 'month')
+
+    data = {
+        'most_spent_category': most_spent_category,
+        'average_monthly_spent': average_monthly_spent,
+        'net_income': net_income,
+        'spending_per_month': list(spending_per_month),
+        'spending_by_category': list(spending_by_category),
+        'total_spent_current_month': total_spent_current_month,
+        'spending_by_category_per_month': list(spending_by_category_per_month)
+    }
+
+    return Response(data)

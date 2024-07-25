@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from . import views
 from .views import ExpenseViewSet
+from .views import analytics
 
 router = DefaultRouter()
 router.register(r'expenses', ExpenseViewSet, basename='expense')
@@ -17,6 +18,7 @@ urlpatterns = [
     path("income/", views.IncomeListCreateView.as_view(), name="income-list"),
     path("income/delete/<int:pk>/", views.IncomeDeleteView.as_view(), name="delete-income"),
     path("category/", views.CategoryListView.as_view(), name="category-list"),
+    path('analytics/', analytics, name="analytics"),
     path('', include(router.urls)),
 
 ]
