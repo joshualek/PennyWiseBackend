@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Sum, Avg, F, ExpressionWrapper, DecimalField
-from django.db.models.functions import ExtractMonth, ExtractYear
+from django.db.models import Sum, Avg, F, ExpressionWrapper, DecimalField, OuterRef, Subquery,IntegerField,Case,When
+from django.db.models.functions import ExtractMonth, ExtractYear, ExtractWeek, Coalesce
 from django.utils.timezone import now
 from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
@@ -151,6 +151,9 @@ class CategoryListView(generics.ListCreateAPIView):
 @api_view(['GET'])
 def analytics(request):
     user = request.user
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
 
     # 1. Most spent on category
     most_spent_category = Expense.objects.filter(budget__user=user) \
@@ -160,7 +163,7 @@ def analytics(request):
         .first()
     
     # 2. Least spent on category
-    least_spent_category = Expense.objects.filter(budget__user=user) \
+    least_spent_category = Expense.objects.filter(budget__user=user, category__isnull=False) \
         .values('category__name') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('total_spent') \
@@ -172,11 +175,17 @@ def analytics(request):
     average_monthly_spent = Expense.objects.filter(budget__user=user, created_at__gte=start_date) \
         .aggregate(average_monthly_spent=Avg('amount'))['average_monthly_spent']
 
-    # 4. Net income (total income - total expenses)
-    total_income = Income.objects.filter(user=user).aggregate(total_income=Sum('amount'))['total_income']
-    total_expenses = Expense.objects.filter(budget__user=user).aggregate(total_expenses=Sum('amount'))['total_expenses']
-    net_income = total_income - total_expenses
+    # 4. Net income (total income - total expenses) for the current month
+    total_income_current_month = Income.objects.filter(user=user, created_at__year=current_year, created_at__month=current_month) \
+        .aggregate(total_income=Sum('amount'))['total_income'] or 0
 
+    total_expenses_current_month = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=current_month) \
+        .aggregate(total_expenses=Sum('amount'))['total_expenses'] or 0
+
+    net_income_current_month = total_income_current_month - total_expenses_current_month
+
+
+ 
     # Additional Statistics
     # 5. Spending per Month
     spending_per_month = Expense.objects.filter(budget__user=user) \
@@ -184,6 +193,26 @@ def analytics(request):
         .values('month') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('month')
+    
+    # 4a. Net income (total income - total expenses) per month
+    total_income_per_month = Income.objects.filter(user=user) \
+        .annotate(month=ExtractMonth('created_at')) \
+        .values('month') \
+        .annotate(total_income=Sum('amount')) \
+        .order_by('month')
+
+    # Create a dictionary for easy lookup of expenses by month
+    expenses_dict = {expense['month']: expense['total_spent'] for expense in spending_per_month}
+
+    net_income_per_month = []
+    for income in total_income_per_month:
+        month = income['month']
+        total_income = income['total_income']
+        total_expenses = expenses_dict.get(month, 0)
+        net_income_per_month.append({
+            'month': month,
+            'net_income': total_income - total_expenses
+        })
 
     # 6. Spending by Category
     spending_by_category = Expense.objects.filter(budget__user=user) \
@@ -206,15 +235,33 @@ def analytics(request):
         .values('category__name', 'month') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('category__name', 'month')
+    
+    # 9. Number of Budgets Exceeded for the Current Month
+    budgets_exceeded = Budget.objects.filter(user=user, created_at__year=current_year, created_at__month=current_month) \
+        .annotate(total_spent=Sum('expense__amount')) \
+        .filter(total_spent__gt=F('amount')) \
+        .count()
+
+    # 10. Weekly Expenses for the Current Month
+    weekly_expenses = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=current_month) \
+        .annotate(week=ExtractWeek('created_at')) \
+        .values('week') \
+        .annotate(total_spent=Sum('amount')) \
+        .order_by('week')
+    
 
     data = {
         'most_spent_category': most_spent_category,
+        'least_spent_category': least_spent_category,
         'average_monthly_spent': average_monthly_spent,
-        'net_income': net_income,
+        'net_income_current_month': net_income_current_month,
+        'net_income_per_month': list(net_income_per_month),
         'spending_per_month': list(spending_per_month),
         'spending_by_category': list(spending_by_category),
         'total_spent_current_month': total_spent_current_month,
-        'spending_by_category_per_month': list(spending_by_category_per_month)
+        'spending_by_category_per_month': list(spending_by_category_per_month),
+        'budgets_exceeded': budgets_exceeded,
+        'weekly_expenses': list(weekly_expenses)
     }
 
     return Response(data)
