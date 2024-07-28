@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Budget, Expense, Income, Category
+from .models import Budget, Expense, Income, Category, StudentDiscount
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,4 +46,9 @@ class IncomeSerializer(serializers.ModelSerializer):
         model = Income
         fields = ["id", "name", "amount", "created_at"]
         read_only_fields = ["id", "created_at"]
-    
+
+class StudentDiscountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentDiscount
+        fields = ["message_id", "channel_id", "message", "date", "created_at", "channel_link", "discount_link"]
+        read_only_fields = ["message_id", "channel_id", "message", "date", "created_at", "channel_link", "discount_link"]

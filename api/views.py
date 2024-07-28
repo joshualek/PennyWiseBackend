@@ -1,10 +1,10 @@
 from django.contrib.auth.models import User
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, viewsets
+from rest_framework import generics, viewsets, response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
-from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer
-from .models import Budget, Expense, Income, Category
+from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer, StudentDiscountSerializer
+from .models import Budget, Expense, Income, Category, StudentDiscount
 
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -139,3 +139,7 @@ class CategoryListView(generics.ListCreateAPIView):
         else:
             print(serializer.errors)
 
+
+class StudentDiscountListView(generics.ListAPIView):
+    queryset = StudentDiscount.objects.all()
+    serializer_class = StudentDiscountSerializer

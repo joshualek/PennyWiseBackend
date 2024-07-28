@@ -17,6 +17,7 @@ urlpatterns = [
     path("income/", views.IncomeListCreateView.as_view(), name="income-list"),
     path("income/delete/<int:pk>/", views.IncomeDeleteView.as_view(), name="delete-income"),
     path("category/", views.CategoryListView.as_view(), name="category-list"),
+    path("student-discount/", views.StudentDiscountListView.as_view(), name="student-discount-list"),
     path('', include(router.urls)),
 
 ]
