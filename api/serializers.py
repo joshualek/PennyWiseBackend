@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Budget, Expense, Income, Category
+from .models import Budget, Expense, Income, Category, Goal
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,4 +46,13 @@ class IncomeSerializer(serializers.ModelSerializer):
         model = Income
         fields = ["id", "name", "amount", "created_at"]
         read_only_fields = ["id", "created_at"]
-    
+
+class GoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Goal
+        fields = ['id', 'name', 'target_amount', 'current_amount', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'current_amount', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        return Goal.objects.create(user=request.user, **validated_data)

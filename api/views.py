@@ -4,13 +4,13 @@ from django.db.models.functions import ExtractMonth, ExtractYear, ExtractWeek, C
 from django.utils.timezone import now
 from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, viewsets
+from rest_framework import generics, viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
-from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer
-from .models import Budget, Expense, Income, Category
+from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer, GoalSerializer
+from .models import Budget, Expense, Income, Category, Goal
 
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -265,3 +265,66 @@ def analytics(request):
     }
 
     return Response(data)
+
+
+class GoalDetailView(generics.RetrieveAPIView):
+    serializer_class = GoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        goal = Goal.objects.filter(user=self.request.user, id=self.kwargs['pk']).first()
+        if not goal:
+            raise NotFound("Goal not found")
+        return goal
+
+class GoalListCreateView(generics.ListCreateAPIView):
+    serializer_class = GoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Goal.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class GoalDeleteView(generics.DestroyAPIView):
+    serializer_class = GoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Goal.objects.filter(user=self.request.user)
+
+class AddSavingsToGoalView(generics.GenericAPIView):
+    serializer_class = GoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        goal = Goal.objects.filter(user=self.request.user, id=self.kwargs['pk']).first()
+        if not goal:
+            raise NotFound("Goal not found")
+        
+        amount = request.data.get('amount')
+        if not amount:
+            return Response({'error': 'Amount is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            amount = float(amount)
+            goal.add_savings(amount)
+            return Response(self.get_serializer(goal).data, status=status.HTTP_200_OK)
+        except ValueError:
+            return Response({'error': 'Invalid amount'}, status=status.HTTP_400_BAD_REQUEST)
+
+class RedeemGoalView(generics.GenericAPIView):
+    serializer_class = GoalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        goal = Goal.objects.filter(user=self.request.user, id=self.kwargs['pk']).first()
+        if not goal:
+            raise NotFound("Goal not found")
+
+        if goal.is_goal_achieved():
+            goal.redeem()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'error': 'Goal not achieved yet'}, status=status.HTTP_400_BAD_REQUEST)

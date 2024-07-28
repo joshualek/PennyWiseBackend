@@ -7,6 +7,7 @@ from .views import analytics
 router = DefaultRouter()
 router.register(r'expenses', ExpenseViewSet, basename='expense')
 
+
 urlpatterns = [
     path("budgets/", views.BudgetListCreateView.as_view(), name="budget-list"),
     path("budgets/<int:pk>/", views.BudgetDetailView.as_view(), name="budget-detail"),
@@ -19,6 +20,11 @@ urlpatterns = [
     path("income/delete/<int:pk>/", views.IncomeDeleteView.as_view(), name="delete-income"),
     path("category/", views.CategoryListView.as_view(), name="category-list"),
     path('analytics/', analytics, name="analytics"),
+    path('goals/', views.GoalListCreateView.as_view(), name='goal-list-create'),
+    path('goals/<int:pk>/', views.GoalDetailView.as_view(), name='goal-detail'),
+    path('goals/delete/<int:pk>/', views.GoalDeleteView.as_view(), name='goal-delete'),
+    path('goals/<int:pk>/add-savings/', views.AddSavingsToGoalView.as_view(), name='add-savings-to-goal'),
+    path('goals/<int:pk>/redeem/', views.RedeemGoalView.as_view(), name='redeem-goal'),
     path('', include(router.urls)),
 
 ]

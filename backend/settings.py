@@ -109,7 +109,7 @@ DATABASES = {
     # }
 }
 
-database_url = "postgresql://pennywise_db_q14k_user:Jj5zLxWVLkJdJuktP5yNeqDwkAyxtY13@dpg-cq12qeuehbks73em00o0-a.singapore-postgres.render.com/pennywise_db_q14k"
+database_url = "postgresql://pennywise_db_ff8v_user:5DKo0IsRV7QBmr1Y0ONmrUs3uLJC86K3@dpg-cqiuv5ogph6c738um0n0-a.singapore-postgres.render.com/pennywise_db_ff8v"
 #os.environ.get("DATABASE_URL")
 DATABASES["default"] = dj_database_url.parse(database_url)
 

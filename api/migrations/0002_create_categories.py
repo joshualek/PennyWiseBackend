@@ -16,7 +16,7 @@ def create_categories(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0004_category_budget_category_expense_category'),  # Replace with the actual name of the previous migration
+        ('api', '0001_initial'),  # Replace with the actual name of the previous migration
     ]
 
     operations = [
