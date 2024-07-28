@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from decimal import Decimal
 from django.utils import timezone
 import json
 import re
@@ -56,9 +57,9 @@ class Goal(models.Model):
     def is_goal_achieved(self):
         return self.current_amount >= self.target_amount
 
-    def add_savings(self, amount):
-        self.current_amount = models.F('current_amount') + amount
-        self.save(update_fields=['current_amount'])
+    def add_savings(self, amount: Decimal):
+        self.current_amount += amount
+        self.save()
 
     def redeem(self):
         if self.is_goal_achieved():

@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Sum, Avg, F, ExpressionWrapper, DecimalField, OuterRef, Subquery,IntegerField,Case,When
+from decimal import Decimal, InvalidOperation
+from django.db.models import Sum, Avg, F, OuterRef, Subquery,IntegerField,Case,When
 from django.db.models.functions import ExtractMonth, ExtractYear, ExtractWeek, Coalesce
 from django.utils.timezone import now
 from datetime import datetime, timedelta
@@ -154,38 +155,49 @@ def analytics(request):
     current_year = datetime.now().year
     current_month = datetime.now().month
 
+    # Get month parameter from request
+    month_param = request.query_params.get('month', str(current_month))
+    try:
+        month = datetime.strptime(month_param, '%B').month  # Convert month name to month number
+    except ValueError:
+        month = int(month_param)  # Try to convert directly to an integer if parsing fails
 
-    # 1. Most spent on category
-    most_spent_category = Expense.objects.filter(budget__user=user) \
+    # Check if there is any data for the selected month
+    expenses_exist = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month).exists()
+    income_exist = Income.objects.filter(user=user, created_at__year=current_year, created_at__month=month).exists()
+
+    if not (expenses_exist or income_exist):
+        return Response({'message': 'You have no data for this month'}, status=200)
+
+
+    # 1. Most spent on category for the selected month
+    most_spent_category = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month) \
         .values('category__name') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('-total_spent') \
         .first()
     
-    # 2. Least spent on category
-    least_spent_category = Expense.objects.filter(budget__user=user, category__isnull=False) \
+    # 2. Least spent on category for the selected month
+    least_spent_category = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month, category__isnull=False) \
         .values('category__name') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('total_spent') \
         .first()
 
-
     # 3. Average monthly spent
-    start_date = now() - timedelta(days=30)
+    start_date = datetime.now() - timedelta(days=30)
     average_monthly_spent = Expense.objects.filter(budget__user=user, created_at__gte=start_date) \
         .aggregate(average_monthly_spent=Avg('amount'))['average_monthly_spent']
 
-    # 4. Net income (total income - total expenses) for the current month
-    total_income_current_month = Income.objects.filter(user=user, created_at__year=current_year, created_at__month=current_month) \
+    # 4. Net income (total income - total expenses) for the selected month
+    total_income_selected_month = Income.objects.filter(user=user, created_at__year=current_year, created_at__month=month) \
         .aggregate(total_income=Sum('amount'))['total_income'] or 0
 
-    total_expenses_current_month = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=current_month) \
+    total_expenses_selected_month = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month) \
         .aggregate(total_expenses=Sum('amount'))['total_expenses'] or 0
 
-    net_income_current_month = total_income_current_month - total_expenses_current_month
+    net_income_selected_month = total_income_selected_month - total_expenses_selected_month
 
-
- 
     # Additional Statistics
     # 5. Spending per Month
     spending_per_month = Expense.objects.filter(budget__user=user) \
@@ -193,7 +205,7 @@ def analytics(request):
         .values('month') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('month')
-    
+
     # 4a. Net income (total income - total expenses) per month
     total_income_per_month = Income.objects.filter(user=user) \
         .annotate(month=ExtractMonth('created_at')) \
@@ -206,27 +218,25 @@ def analytics(request):
 
     net_income_per_month = []
     for income in total_income_per_month:
-        month = income['month']
+        month_income = income['month']
         total_income = income['total_income']
-        total_expenses = expenses_dict.get(month, 0)
+        total_expenses = expenses_dict.get(month_income, 0)
         net_income_per_month.append({
-            'month': month,
+            'month': month_income,
             'net_income': total_income - total_expenses
         })
 
-    # 6. Spending by Category
-    spending_by_category = Expense.objects.filter(budget__user=user) \
+    # 6. Spending by Category for the selected month
+    spending_by_category = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month) \
         .values('category__name') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('-total_spent')
     
-    # 7. Total spending for the current month
-    current_year = datetime.now().year
-    current_month = datetime.now().month
-    total_spent_current_month = Expense.objects.filter(
+    # 7. Total spending for the selected month
+    total_spent_selected_month = Expense.objects.filter(
         budget__user=user, 
         created_at__year=current_year, 
-        created_at__month=current_month
+        created_at__month=month
     ).aggregate(total_spent=Sum('amount'))['total_spent']
 
     # 8. Spending by Category per Month
@@ -236,35 +246,35 @@ def analytics(request):
         .annotate(total_spent=Sum('amount')) \
         .order_by('category__name', 'month')
     
-    # 9. Number of Budgets Exceeded for the Current Month
-    budgets_exceeded = Budget.objects.filter(user=user, created_at__year=current_year, created_at__month=current_month) \
+    # 9. Number of Budgets Exceeded for the Selected Month
+    budgets_exceeded = Budget.objects.filter(user=user, created_at__year=current_year, created_at__month=month) \
         .annotate(total_spent=Sum('expense__amount')) \
         .filter(total_spent__gt=F('amount')) \
         .count()
 
-    # 10. Weekly Expenses for the Current Month
-    weekly_expenses = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=current_month) \
+    # 10. Weekly Expenses for the Selected Month
+    weekly_expenses = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month) \
         .annotate(week=ExtractWeek('created_at')) \
         .values('week') \
         .annotate(total_spent=Sum('amount')) \
         .order_by('week')
-    
 
     data = {
         'most_spent_category': most_spent_category,
         'least_spent_category': least_spent_category,
         'average_monthly_spent': average_monthly_spent,
-        'net_income_current_month': net_income_current_month,
+        'net_income_current_month': net_income_selected_month,
         'net_income_per_month': list(net_income_per_month),
         'spending_per_month': list(spending_per_month),
         'spending_by_category': list(spending_by_category),
-        'total_spent_current_month': total_spent_current_month,
+        'total_spent_current_month': total_spent_selected_month,
         'spending_by_category_per_month': list(spending_by_category_per_month),
         'budgets_exceeded': budgets_exceeded,
         'weekly_expenses': list(weekly_expenses)
     }
 
     return Response(data)
+
 class StudentDiscountListView(generics.ListAPIView):
     queryset = StudentDiscount.objects.all()
     serializer_class = StudentDiscountSerializer
@@ -297,6 +307,13 @@ class GoalDeleteView(generics.DestroyAPIView):
     def get_queryset(self):
         return Goal.objects.filter(user=self.request.user)
 
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        response_data = {'success': 'Goal deleted', 'message': 'Goal deleted successfully'}
+        print("Delete Response Data:", response_data)
+        return Response(response_data, status=status.HTTP_200_OK)
+
 class AddSavingsToGoalView(generics.GenericAPIView):
     serializer_class = GoalSerializer
     permission_classes = [IsAuthenticated]
@@ -311,10 +328,10 @@ class AddSavingsToGoalView(generics.GenericAPIView):
             return Response({'error': 'Amount is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            amount = float(amount)
+            amount = Decimal(amount)
             goal.add_savings(amount)
             return Response(self.get_serializer(goal).data, status=status.HTTP_200_OK)
-        except ValueError:
+        except InvalidOperation:
             return Response({'error': 'Invalid amount'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RedeemGoalView(generics.GenericAPIView):
@@ -324,10 +341,16 @@ class RedeemGoalView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         goal = Goal.objects.filter(user=self.request.user, id=self.kwargs['pk']).first()
         if not goal:
-            raise NotFound("Goal not found")
+            response_data = {'error': 'Goal not found'}
+            print("Redeem Response Data:", response_data)
+            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
 
         if goal.is_goal_achieved():
             goal.redeem()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            response_data = {'success': 'Goal redeemed', 'message': 'Goal redeemed successfully'}
+            print("Redeem Response Data:", response_data)
+            return Response(response_data, status=status.HTTP_200_OK)
         else:
-            return Response({'error': 'Goal not achieved yet'}, status=status.HTTP_400_BAD_REQUEST)
+            response_data = {'error': 'Goal not achieved yet'}
+            print("Redeem Response Data:", response_data)
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)

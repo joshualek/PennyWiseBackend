@@ -53,9 +53,7 @@ class GoalSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'target_amount', 'current_amount', 'created_at', 'updated_at']
         read_only_fields = ['id', 'current_amount', 'created_at', 'updated_at']
 
-    def create(self, validated_data):
-        request = self.context.get('request')
-        return Goal.objects.create(user=request.user, **validated_data)
+
     
 class StudentDiscountSerializer(serializers.ModelSerializer):
     class Meta:
