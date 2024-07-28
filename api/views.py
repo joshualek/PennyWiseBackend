@@ -9,8 +9,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
-from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer, GoalSerializer
-from .models import Budget, Expense, Income, Category, Goal
+from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer, StudentDiscountSerializer, GoalSerializer
+from .models import Budget, Expense, Income, Category, StudentDiscount, Goal
 
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -265,6 +265,9 @@ def analytics(request):
     }
 
     return Response(data)
+class StudentDiscountListView(generics.ListAPIView):
+    queryset = StudentDiscount.objects.all()
+    serializer_class = StudentDiscountSerializer
 
 
 class GoalDetailView(generics.RetrieveAPIView):
