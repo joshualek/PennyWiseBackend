@@ -1,6 +1,6 @@
 asgiref==3.8.1
 dj-database-url==2.2.0
-Django==5.0.6
+Django==5.0.7
 django-cors-headers==4.4.0
 django-environ==0.11.2
 django-filter==24.2
@@ -9,9 +9,12 @@ djangorestframework-simplejwt==5.3.1
 gunicorn==22.0.0
 packaging==24.1
 psycopg2-binary==2.9.9
+pyaes==1.6.1
+pyasn1==0.6.0
 PyJWT==2.8.0
 python-dotenv==1.0.1
 pytz==2024.1
+rsa==4.9
 sqlparse==0.5.0
-Telethon
+Telethon==1.36.0
 typing_extensions==4.12.2

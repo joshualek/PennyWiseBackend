@@ -26,14 +26,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j=y8fc(t6xysu#j$jql)izt&1uv3w_bm$5zurp2^tfpe!2$@a4'
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-#os.environ.get("DEBUG", "False").lower() == "true"
+DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = ["*"]
-#os.environ.get("ALLOWED_HOSTS").split(" ")
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS").split(" ")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -109,8 +107,7 @@ DATABASES = {
     # }
 }
 
-database_url = "postgresql://pennywise_db_ff8v_user:5DKo0IsRV7QBmr1Y0ONmrUs3uLJC86K3@dpg-cqiuv5ogph6c738um0n0-a.singapore-postgres.render.com/pennywise_db_ff8v"
-#os.environ.get("DATABASE_URL")
+database_url = os.environ.get("DATABASE_URL")
 DATABASES["default"] = dj_database_url.parse(database_url)
 
 # Password validation
