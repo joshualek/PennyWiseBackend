@@ -162,12 +162,7 @@ def analytics(request):
     except ValueError:
         month = int(month_param)  # Try to convert directly to an integer if parsing fails
 
-    # Check if there is any data for the selected month
-    expenses_exist = Expense.objects.filter(budget__user=user, created_at__year=current_year, created_at__month=month).exists()
-    income_exist = Income.objects.filter(user=user, created_at__year=current_year, created_at__month=month).exists()
 
-    if not (expenses_exist or income_exist):
-        return Response({'message': 'You have no data for this month'}, status=200)
 
 
     # 1. Most spent on category for the selected month
