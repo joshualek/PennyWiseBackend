@@ -1,3 +1,4 @@
+
 from django.contrib.auth.models import User
 from decimal import Decimal, InvalidOperation
 from django.db.models import Sum, Avg, F, OuterRef, Subquery,IntegerField,Case,When
@@ -12,6 +13,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import NotFound
 from .serializers import UserSerializer, BudgetSerializer, ExpenseSerializer, IncomeSerializer, CategorySerializer, StudentDiscountSerializer, GoalSerializer
 from .models import Budget, Expense, Income, Category, StudentDiscount, Goal
+from openpyxl import Workbook
+from django.http import HttpResponse
+from rest_framework.views import APIView
+
 
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -349,3 +354,40 @@ class RedeemGoalView(generics.GenericAPIView):
             response_data = {'error': 'Goal not achieved yet'}
             print("Redeem Response Data:", response_data)
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+
+
+
+class ExportDataView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        # Fetch the user's expenses and income data
+        budgets = Budget.objects.filter(user=user)
+        expenses = Expense.objects.filter(budget__in=budgets)
+        income = Income.objects.filter(user=user)
+
+        # Create a new Excel workbook
+        wb = Workbook()
+        ws_expenses = wb.active
+        ws_expenses.title = "Expenses"
+
+        # Write the expenses data to the workbook
+        ws_expenses.append(["Date", "Category", "Amount", "Description"])
+        for expense in expenses:
+            ws_expenses.append([expense.created_at.strftime('%Y-%m-%d'), expense.category.name, expense.amount, expense.name])
+
+        # Create a new sheet for income data
+        ws_income = wb.create_sheet(title="Income")
+        ws_income.append(["Date", "Source", "Amount"])
+        for inc in income:
+            ws_income.append([inc.created_at.strftime('%Y-%m-%d'), inc.name, inc.amount])
+
+        # Prepare the response
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response['Content-Disposition'] = 'attachment; filename=financial_data.xlsx'
+        wb.save(response)
+
+        return response
